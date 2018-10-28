@@ -8,10 +8,10 @@ from keras.optimizers import Adam
 from keras.regularizers import l2
 
 from keras_gat import GraphAttention
-from keras_gat.utils import load_data, preprocess_features
+from keras_gat.utils import load_data, preprocess_features, load_protein_function
 
 # Read data
-A, X, Y_train, Y_val, Y_test, idx_train, idx_val, idx_test = load_data('cora')
+A, X, Y_train, Y_val, Y_test, idx_train, idx_val, idx_test = load_protein_function('yeast')
 
 # Parameters
 N = X.shape[0]                # Number of nodes in the graph
@@ -28,6 +28,7 @@ es_patience = 100             # Patience fot early stopping
 # Preprocessing operations
 X = preprocess_features(X)
 A = A + np.eye(A.shape[0])  # Add self-loops
+
 
 # Model definition (as per Section 3.3 of the paper)
 X_in = Input(shape=(F,))
@@ -46,7 +47,7 @@ graph_attention_2 = GraphAttention(n_classes,
                                    attn_heads=1,
                                    attn_heads_reduction='average',
                                    dropout_rate=dropout_rate,
-                                   activation='softmax',
+                                   activation='sigmoid',
                                    kernel_regularizer=l2(l2_reg),
                                    attn_kernel_regularizer=l2(l2_reg))([dropout2, A_in])
 
@@ -54,7 +55,7 @@ graph_attention_2 = GraphAttention(n_classes,
 model = Model(inputs=[X_in, A_in], outputs=graph_attention_2)
 optimizer = Adam(lr=learning_rate)
 model.compile(optimizer=optimizer,
-              loss='categorical_crossentropy',
+              loss='binary_crossentropy',
               weighted_metrics=['acc'])
 model.summary()
 
