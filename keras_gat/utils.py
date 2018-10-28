@@ -11,6 +11,7 @@ from scipy.sparse import coo_matrix
 import scipy.io as sio
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import binarize
+import pandas as pd
 
 def parse_index_file(filename):
     """Parse index file."""
@@ -130,12 +131,6 @@ def _load_network(filename, num_genes, mtrx='adj'):
 
     return A
 
-def mask_labels(labels, mask):
-    y = np.zeros(labels.shape)
-    y[mask, :] = labels[mask, :]
-    return y
-
-
 def load_protein_function(org):
     """Load data."""
     FILE_PATH = os.path.abspath(__file__)
@@ -143,13 +138,16 @@ def load_protein_function(org):
     DATA_PATH = os.path.join(DIR_PATH, 'data/')
 
     # get number of nodes N to create N * N adjacency matrix
-    import pandas as pd
     geneids = pd.read_csv(DATA_PATH + '/'+org+'/' + org + '_string_genes.txt', sep="\t", header=None)
     num_genes = geneids.shape[0]
 
-    file_name = DATA_PATH + '/'+org+'/' + org + '_string_fusion_adjacency.txt'
+    net = 'neighborhood'
+    filename = DATA_PATH + '/'+org+'/' + org + '_string_' + net + '_adjacency.txt'
+
+
+    # file_name = DATA_PATH + '/'+org+'/' + org + '_string_cooccurence_adjacency.txt'
     labels = sio.loadmat(DATA_PATH + '/'+org+'/' + org + '_annotations.mat')
-    adj = _load_network(file_name, num_genes)
+    adj = _load_network(filename, num_genes)
 
     # Assign the adjacency matrix as features
     features = sp.csr_matrix(adj).tolil()
@@ -159,42 +157,48 @@ def load_protein_function(org):
     # Binarize the adjacency matrix
     A = binarize(adj, 0)
 
-    labels_1 = labels['level1']
-    labels_2 = labels['level2']
-    labels_3 = labels['level3']
-    label_index = np.nonzero(np.sum(labels_1, axis=1))[0]
+    labels = labels['level1']
+    label_index = np.nonzero(np.sum(labels, axis=1))[0]
     # print(label_index, len(label_index))
     # idx = list(np.arange(labels.shape[0]))
-    idx_train, idx_test = train_test_split(label_index, test_size=0.5)
-    idx_train, idx_val = train_test_split(idx_train, test_size=0.5)
+    idx_train, idx_test = train_test_split(label_index, test_size=0.5, random_state=42)
+    idx_train, idx_val = train_test_split(idx_train, test_size=0.5, random_state=42)
 
-    train_mask = sample_mask(idx_train, labels_1.shape[0])
-    val_mask = sample_mask(idx_val, labels_1.shape[0])
-    test_mask = sample_mask(idx_test, labels_1.shape[0])
+    train_mask = sample_mask(idx_train, labels.shape[0])
+    val_mask = sample_mask(idx_val, labels.shape[0])
+    test_mask = sample_mask(idx_test, labels.shape[0])
 
-    y_train=[]
-    y_train.append(mask_labels(labels_1, train_mask))
-    y_train.append(mask_labels(labels_2, train_mask))
-    y_train.append(mask_labels(labels_3, train_mask))
-
-    y_val = []
-    y_val.append(mask_labels(labels_1, val_mask))
-    y_val.append(mask_labels(labels_2, val_mask))
-    y_val.append(mask_labels(labels_3, val_mask))
-
-    y_test = []
-    y_test.append(mask_labels(labels_1, test_mask))
-    y_test.append(mask_labels(labels_2, test_mask))
-    y_test.append(mask_labels(labels_3, test_mask))
+    y_train = np.zeros(labels.shape)
+    y_val = np.zeros(labels.shape)
+    y_test = np.zeros(labels.shape)
+    y_train[train_mask, :] = labels[train_mask, :]
+    y_val[val_mask, :] = labels[val_mask, :]
+    y_test[test_mask, :] = labels[test_mask, :]
 
     print("Details of dataset")
     print("# Nodes:", num_genes)
     print("# Nodes with labels:", len(label_index))
     print("# Edges:", np.count_nonzero(A))
     print("# Features/node:", features.shape[1])
-    # print("# Class:", labels.shape[1])
+    print("# Class:", labels.shape[1])
     print("# Training nodes:", len(idx_train))
     print("# Validation nodes:", len(idx_val))
     print("# Testing nodes:", len(idx_test))
 
     return A, features, y_train, y_val, y_test, train_mask, val_mask, test_mask
+
+def load_networks(filenames, num_genes, mtrx='adj'):
+    """
+    Function for loading Mashup files
+    Files can be downloaded from:
+        http://cb.csail.mit.edu/cb/mashup/
+    """
+
+    features = []
+    adjs = []
+    for filename in filenames:
+        A = _load_network(filename, num_genes, mtrx)
+        features = sp.csr_matrix(adj).tolil()
+        features.append()
+
+    return Nets
